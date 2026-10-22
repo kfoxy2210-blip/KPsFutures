@@ -1,0 +1,48 @@
+# GitHub me yeh file `.github/workflows/build.yml` naam se banao (text copy-paste).
+# Repo me KPsFutures.zip upload karo -> ek APK (KPsFutures.apk) ban jayega.
+name: Build KPs Futures
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Zip kholo aur project folder dhoondo
+        id: loc
+        run: |
+          for z in *.zip; do if [ -f "$z" ]; then unzip -oq "$z"; fi; done
+          dir=$(find . -type d -name "KPsFutures" -not -path "./.git/*" | head -1)
+          if [ -z "$dir" ]; then
+            echo "ERROR: folder KPsFutures nahi mila. Repo me ye files hain:"
+            ls -R | head -60
+            exit 1
+          fi
+          echo "Project folder: $dir"
+          echo "dir=$dir" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Build APK
+        working-directory: ${{ steps.loc.outputs.dir }}
+        run: gradle assembleRelease --no-daemon
+      - name: Rename APK
+        run: |
+          mkdir -p dist
+          cp ${{ steps.loc.outputs.dir }}/app/build/outputs/apk/release/*.apk dist/KPsFutures.apk
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: futures-build-${{ github.run_number }}
+          name: KPs Futures build ${{ github.run_number }}
+          files: dist/KPsFutures.apk
